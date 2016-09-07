@@ -6,6 +6,7 @@ module Fastlane
     require 'fileutils'
     class MigrateGitRepositoryAction < Action
       def self.run(params)
+        script_path = File.dirname(File.dirname(File.dirname(__FILE__)))
         Dir.mktmpdir do |tmpdir|
           Helper.log.info "Cloning Repository from #{params[:from_repo_url]} into #{tmpdir}"
           clone_result = Actions.sh("git clone #{params[:from_repo_url]} #{tmpdir}")
@@ -13,11 +14,19 @@ module Fastlane
               Helper.log.info "Skipping empty repository #{params[:to_repo_url]}"
           else
             Dir.chdir(tmpdir) do
+
+              # changes (rename ruby hack /  hook external script)
+              if params[:custom_script]
+                custom_script = File.open("#{script_path}/#{params[:custom_script]}", "r")
+                Actions.sh(custom_script)
+              end
+
               Actions.sh("git remote add newOrigin #{params[:to_repo_url]}")
               default_branch = Actions.sh("git rev-parse --abbrev-ref HEAD")
               Actions.sh("for remote in `git branch -r | grep -v #{default_branch} `; do git checkout --track $remote ; done")
               Actions.sh("git push newOrigin --all")
               Actions.sh("git push newOrigin --tags")
+
             end
           end
         end
@@ -49,7 +58,13 @@ module Fastlane
            description: "The url of the target remote to which the repository should be migrated",
            verify_block: proc do |value|
             raise "No Destination URL for MigrateGitRepositoryAction given, pass using `to_repo_url: 'url'`".red unless (value and not value.empty?)
-          end)
+          end),
+          FastlaneCore::ConfigItem.new(key: :custom_script,
+           env_name: "FL_MIGRATE_GIT_CUSTOM_SCRIPT",
+           is_string: true,
+           optional: true,
+           description: "Custom script to be executed between the clone and the push on the destination server",
+           )
         ]
       end
 

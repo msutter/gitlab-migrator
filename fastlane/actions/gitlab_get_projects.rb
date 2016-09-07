@@ -8,7 +8,13 @@ module Fastlane
     class GitlabGetProjectsAction < Action
       def self.run(params)
         client = Gitlab.client(endpoint: params[:endpoint], private_token: params[:api_token])
-        client.projects.auto_paginate
+        all_projects = client.projects.auto_paginate
+        if params[:namespace]
+          projects = all_projects.select { |p| p.namespace.path == params[:namespace]}
+        else
+          projects = all_projects
+        end
+        projects
       end
 
       #####################################################
@@ -21,7 +27,7 @@ module Fastlane
 
       def self.details
         # Optional:
-        # this is your change to provide a more detailed description of this action
+        # that is your change to provide a more detailed description of that action
         "Only projects the user has access to will be returned"
       end
 
@@ -43,7 +49,13 @@ module Fastlane
                                        is_string: true,
                                        verify_block: proc do |value|
                                           raise "No API-Token for GitlabGetProjectsAction given, pass using `api_token: 'token'`".red unless (value and not value.empty?)
-                                       end)
+                                       end),
+          FastlaneCore::ConfigItem.new(key: :namespace,
+                                       env_name: "FL_GITLAB_GET_RNAMESPACE",
+                                       description: "Namespace (group) of the projects",
+                                       is_string: true,
+                                       optional: true,
+                                       )
         ]
       end
 
