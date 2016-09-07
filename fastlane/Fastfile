@@ -124,11 +124,11 @@ platform :ios do
         git_protocol_dst = new_project.ssh_url_to_repo
       end
 
-      migrate_git_repository(from_repo_url: git_protocol_src, to_repo_url: git_protocol_dst)
+      migrate_git_repository(custom_script: params[:custom_script],from_repo_url: git_protocol_src, to_repo_url: git_protocol_dst)
 
       if project.wiki_enabled
         Helper.log.info("Migrating wiki-repository")
-        migrate_git_repository(from_repo_url: git_protocol_src.gsub('.git', '.wiki.git'), to_repo_url: git_protocol_dst.gsub('.git', '.wiki.git'))
+        migrate_git_repository(custom_script: params[:custom_script], from_repo_url: git_protocol_src.gsub('.git', '.wiki.git'), to_repo_url: git_protocol_dst.gsub('.git', '.wiki.git'))
       end
     end
   end

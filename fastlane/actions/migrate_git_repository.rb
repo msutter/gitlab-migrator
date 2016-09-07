@@ -6,7 +6,7 @@ module Fastlane
     require 'fileutils'
     class MigrateGitRepositoryAction < Action
       def self.run(params)
-        script_path = File.dirname(File.dirname(File.dirname(__FILE__)))
+        script_path = "#{File.dirname(File.dirname(File.dirname(__FILE__)))}/scripts"
         Dir.mktmpdir do |tmpdir|
           Helper.log.info "Cloning Repository from #{params[:from_repo_url]} into #{tmpdir}"
           clone_result = Actions.sh("git clone #{params[:from_repo_url]} #{tmpdir}")
@@ -17,8 +17,10 @@ module Fastlane
 
               # changes (rename ruby hack /  hook external script)
               if params[:custom_script]
-                custom_script = File.open("#{script_path}/#{params[:custom_script]}", "r")
-                Actions.sh(custom_script)
+                Helper.log.info "Running custom script #{params[:custom_script]} with content"
+                custom_script = File.read("#{script_path}/#{params[:custom_script]}")
+                Helper.log.info custom_script
+                Actions.sh("/bin/bash #{script_path}/#{params[:custom_script]}")
               end
 
               Actions.sh("git remote add newOrigin #{params[:to_repo_url]}")
