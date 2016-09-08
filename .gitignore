@@ -4,6 +4,9 @@
 # fastlane specific
 fastlane/report.xml
 
+# custom scripts
+scripts/custom/**/*
+
 # deliver temporary files
 fastlane/Preview.html
 

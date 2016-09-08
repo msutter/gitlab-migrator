@@ -77,14 +77,15 @@ platform :ios do
        raise "Please give the project name or the namespace name (group name)"
     end
 
-    Helper.log.info("Checking the source for existing projects with namespace #{params[:namespace]}")
-    projects_src = gitlab_get_projects(namespace: params[:namespace], endpoint: ENV["FL_GITLAB_ENDPOINT_SRC"], api_token: ENV["FL_GITLAB_TOKEN_SRC"]).sort { |a, b| a.path_with_namespace <=> b.path_with_namespace }
-
     if params[:project]
+      Helper.log.info("Checking the source for existing projects with path #{params[:project]}")
+      projects_src = gitlab_get_projects(project: params[:project], endpoint: ENV["FL_GITLAB_ENDPOINT_SRC"], api_token: ENV["FL_GITLAB_TOKEN_SRC"]).sort { |a, b| a.path_with_namespace <=> b.path_with_namespace }
       raise "Project with path #{params[:project]} not found in source #{ENV["FL_GITLAB_ENDPOINT_SRC"]}" unless projects_src.count == 1
     end
 
     if params[:namespace]
+      Helper.log.info("Checking the source for existing projects with namespace #{params[:namespace]}")
+      projects_src = gitlab_get_projects(namespace: params[:namespace], endpoint: ENV["FL_GITLAB_ENDPOINT_SRC"], api_token: ENV["FL_GITLAB_TOKEN_SRC"]).sort { |a, b| a.path_with_namespace <=> b.path_with_namespace }
       raise "Project with namespace #{params[:namespace]} not found in source #{ENV["FL_GITLAB_ENDPOINT_SRC"]}" unless projects_src.count == 1
     end
 

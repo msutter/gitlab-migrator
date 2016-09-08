@@ -11,6 +11,8 @@ module Fastlane
         all_projects = client.projects.auto_paginate
         if params[:namespace]
           projects = all_projects.select { |p| p.namespace.path == params[:namespace]}
+        elsif params[:project]
+          projects = all_projects.select { |p| p.path_with_namespace == params[:project]}
         else
           projects = all_projects
         end
@@ -53,6 +55,12 @@ module Fastlane
           FastlaneCore::ConfigItem.new(key: :namespace,
                                        env_name: "FL_GITLAB_GET_RNAMESPACE",
                                        description: "Namespace (group) of the projects",
+                                       is_string: true,
+                                       optional: true,
+                                       ),
+          FastlaneCore::ConfigItem.new(key: :project,
+                                       env_name: "FL_GITLAB_GET_RPROJECT",
+                                       description: "Project name with namespace (group) of the project",
                                        is_string: true,
                                        optional: true,
                                        )

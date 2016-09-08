@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# Helper script to show and commit changes in the git repo
+# This script takes the commit message as parameter
+#
+# You call this script at the end of your custom script located in the 'scripts/custom' directory
+# Example:
+#
+#     $(dirname ${BASH_SOURCE[0]})/../show_changes_and_commit 'my commit message'
+#
+
+if [ -z "$1" ]
+then
+  echo "No commit message supplied"
+fi
+
+files_count=`git status --porcelain | wc -l`
+
+if [ $files_count -gt 0 ]
+then
+# Add and commit
+  changed_files=`git status --porcelain`
+  echo "${files_count} files changed:"
+  echo $changed_files
+  git add --all
+  git commit -m "${1}"
+else
+  echo "no changed files"
+fi
