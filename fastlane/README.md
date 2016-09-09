@@ -17,7 +17,7 @@ fastlane ios migrate
 ```
 Migrate a specific project
 
-Specify the project that should be migrated by its path (with namespace) via the project parameter
+Specify the project(s) that should be migrated by its path (with namespace) or by namespace
 
 Example: fastlane migrate project:cocoapods/specs
 

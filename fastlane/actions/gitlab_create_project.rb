@@ -10,10 +10,12 @@ module Fastlane
         source = Gitlab.client(endpoint: params[:endpoint_src], private_token: params[:api_token_src])
         destination = Gitlab.client(endpoint: params[:endpoint_dst], private_token: params[:api_token_dst])
         original_project = params[:project]
-        Helper.log.info "Creating Project: #{original_project.path_with_namespace}"
+        path_map = JSON.load ENV["GITLAB_PATH_MAP"]
+        Helper.log.info "Creating Project: #{path_map[original_project.path_with_namespace]}"
 
         # Estimate User-Mapping
         user_mapping = map_users(source, destination)
+        Helper.log.info "User Mapping: #{user_mapping}"
 
         # Check if the Group and Namespace for the Project exist already
         group = ensure_group(source, destination, original_project.namespace, user_mapping)
@@ -49,18 +51,30 @@ module Fastlane
         new_project
       end
 
-      # Given a group (with path-name) from the original project, 
+      # Given a group (with path-name) from the original project,
       # checks if a group with the same path-name exists in the destination gitlab.
       # If necessary, a group with that path-name is created
       # The group (in the destination gitlab) is returned
       def self.ensure_group(gitlab_src, gitlab_dst, namespace, user_mapping)
-        Helper.log.info("Searching for group with name '#{namespace.name}' and path: '#{namespace.path}'")
-        group = gitlab_dst.groups.auto_paginate.select { |g| g.path == namespace.path}.first
+        # check if group has mapping (rename)
+        path_map = JSON.load ENV["GITLAB_PATH_MAP"]
+        Helper.log.info("Namespace '#{namespace.path}'")
+
+        if path_map.key?(namespace.path)
+          namespace_dst = path_map[namespace.path]
+        else
+          namespace_dst = namespace.path
+        end
+
+        Helper.log.info("Searching for group with name '#{namespace.name}' and path: '#{namespace_dst}'")
+        group = gitlab_dst.groups.auto_paginate.select { |g| g.path == namespace_dst}.first
         if group
           Helper.log.info("Existing group '#{group.name}' found")
         else
           Helper.log.info("Group '#{namespace.name}' does not yet exist, will be created now")
-          group = gitlab_dst.create_group(namespace.name, namespace.path)
+          # group = gitlab_dst.create_group(namespace.name, namespace_dst)
+          group = gitlab_dst.create_group(namespace.name, namespace_dst)
+
           # Populate group with users
           # Keep in mind: User-Mapping is estimated and not garuanteed. Users have to exist in the new gitlab 
           # before migrating projects and their name or username has to match their name/username in the old gitlab
@@ -75,19 +89,20 @@ module Fastlane
       # Reads all users from the source gitlab and sees if there is an existing user (with the same name)
       # in the new gitlab. If so, an entrie to map the old id to the new id is inserted into the user map
       def self.map_users(gitlab_src, gitlab_dst)
-        users_src = gitlab_src.users.auto_paginate
-        users_dst = gitlab_dst.users.auto_paginate
-
         user_map = {}
-        users_src.each do |user|
-          users = users_dst.select { |u| u.username == user.username or u.name == user.name}
-          if users.count == 1
-            # Only map users that are unambiguously the same. If there are several matches, dont match them
-            Helper.log.info("Mapping user #{user.username} to #{users.first.username}: #{user.id}=#{users.first.id}")
-            user_map[user.id] = users.first.id
+        unless ENV['FL_GITLAB_SKIP_USERS'] == 'true'
+          users_src = gitlab_src.users.auto_paginate
+          users_dst = gitlab_dst.users.auto_paginate
+          users_src.each do |user|
+            users = users_dst.select { |u| u.username == user.username or u.name == user.name}
+            if users.count == 1
+              # Only map users that are unambiguously the same. If there are several matches, dont match them
+              Helper.log.info("Mapping user #{user.username} to #{users.first.username}: #{user.id}=#{users.first.id}")
+              user_map[user.id] = users.first.id
+            end
           end
-        end
-        Helper.log.info("User Mapping determined: #{user_map}")
+          Helper.log.info("User Mapping determined: #{user_map}")
+          end
         user_map
       end
 
@@ -208,6 +223,11 @@ module Fastlane
                                        verify_block: proc do |value|
                                           raise "No Destination API-Token for GitlabeCreateProjectAction given, pass using `api_token_dst: 'token'`".red unless (value and not value.empty?)
                                        end),
+          FastlaneCore::ConfigItem.new(key: :skip_users,
+                                       env_name: "FL_GITLAB_SKIP_USERS",
+                                       description: "Skip user migration",
+                                       is_string: true,
+                                       ),
           FastlaneCore::ConfigItem.new(key: :project,
                                        env_name: "FL_GITLAB_CREATE_PROJECT_PROJECT",
                                        description: "The project that should be created in the target gitlab instance, is expected to be from the source gitlab instance",

@@ -16,6 +16,7 @@ module Fastlane
         else
           projects = all_projects
         end
+
         projects
       end
 

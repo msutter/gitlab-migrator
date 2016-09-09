@@ -24,6 +24,25 @@ platform :ios do
   before_all do
     # ENV["SLACK_URL"] = "https://hooks.slack.com/services/..."
     ENV["GITLAB_API_HTTPARTY_OPTIONS"]="{verify: false}"
+
+    # load projects/namespace mapping
+    current_path = File.expand_path(__FILE__)
+    maps_path = "#{File.dirname(File.dirname(current_path))}/maps"
+
+    map_files = Dir["#{maps_path}/*"]
+    if map_files.empty?
+      Helper.log.info("No mapping file found")
+    else
+      map = {}
+      map_files.each do |map_file|
+        Helper.log.info("Using map file #{map_file}")
+        content = File.read(map_file)
+        map.merge!(Hash[*content.split(/[; \n]+/)])
+      end
+      Helper.log.info("Path Map: #{JSON.pretty_generate(map).gsub(":", " =>")}")
+      ENV["GITLAB_PATH_MAP"] = JSON.dump map
+    end
+
   end
 
   desc "Lists all projects of the source"
@@ -68,40 +87,54 @@ platform :ios do
   end
 
   desc "Migrate a specific project"
-  desc "Specify the project that should be migrated by its path (with namespace) via the project parameter"
+  desc "Specify the project(s) that should be migrated by its path (with namespace) or by namespace"
   desc "Example: fastlane migrate project:cocoapods/specs"
   lane :migrate do |params|
 
-
-    unless params[:project] || params[:namespace]
+    unless ENV['FL_GITLAB_GET_RPROJECT'] || ENV['FL_GITLAB_GET_RNAMESPACE'] || params[:project] || params[:namespace]
        raise "Please give the project name or the namespace name (group name)"
     end
 
-    if params[:project]
-      Helper.log.info("Checking the source for existing projects with path #{params[:project]}")
-      projects_src = gitlab_get_projects(project: params[:project], endpoint: ENV["FL_GITLAB_ENDPOINT_SRC"], api_token: ENV["FL_GITLAB_TOKEN_SRC"]).sort { |a, b| a.path_with_namespace <=> b.path_with_namespace }
-      raise "Project with path #{params[:project]} not found in source #{ENV["FL_GITLAB_ENDPOINT_SRC"]}" unless projects_src.count == 1
+    if project_src = params[:project] || ENV['FL_GITLAB_GET_RPROJECT']
+      project_dst = project_src
+      # source
+      Helper.log.info("Checking the source for existing projects with path #{project_src}")
+      projects_src = gitlab_get_projects(project: project_src, endpoint: ENV["FL_GITLAB_ENDPOINT_SRC"], api_token: ENV["FL_GITLAB_TOKEN_SRC"]).sort { |a, b| a.path_with_namespace <=> b.path_with_namespace }
+      #Helper.log.info("Project: #{projects_src}")
+      raise "Project with path #{project} not found in source #{ENV["FL_GITLAB_ENDPOINT_SRC"]}" unless projects_src.count == 1
+
+      # destination
+      Helper.log.info("Checking the destination for existing projects with path #{project_dst}")
+      projects_dst = gitlab_get_projects(project: project_dst, endpoint: ENV["FL_GITLAB_ENDPOINT_SRC"], api_token: ENV["FL_GITLAB_TOKEN_SRC"]).sort { |a, b| a.path_with_namespace <=> b.path_with_namespace }
     end
 
-    if params[:namespace]
-      Helper.log.info("Checking the source for existing projects with namespace #{params[:namespace]}")
-      projects_src = gitlab_get_projects(namespace: params[:namespace], endpoint: ENV["FL_GITLAB_ENDPOINT_SRC"], api_token: ENV["FL_GITLAB_TOKEN_SRC"]).sort { |a, b| a.path_with_namespace <=> b.path_with_namespace }
-      raise "Project with namespace #{params[:namespace]} not found in source #{ENV["FL_GITLAB_ENDPOINT_SRC"]}" unless projects_src.count == 1
-    end
+    if namespace_src = params[:namespace] || ENV['FL_GITLAB_GET_RNAMESPACE']
+      # source
+      Helper.log.info("Checking the source for existing projects with namespace #{namespace_src}")
+      projects_src = gitlab_get_projects(namespace: namespace_src, endpoint: ENV["FL_GITLAB_ENDPOINT_SRC"], api_token: ENV["FL_GITLAB_TOKEN_SRC"]).sort { |a, b| a.path_with_namespace <=> b.path_with_namespace }
+      Helper.log.info("Project: #{projects_src}")
+      raise "Project with namespace #{namespace_src} not found in source #{ENV["FL_GITLAB_ENDPOINT_SRC"]}" unless projects_src.count == 1
 
-    Helper.log.info("Checking the destination for existing project #{params[:namespace]}")
-    all_projects_dst = gitlab_get_projects(namespace: params[:namespace] ,endpoint: ENV["FL_GITLAB_ENDPOINT_DST"], api_token: ENV["FL_GITLAB_TOKEN_DST"]).sort { |a, b| a.path_with_namespace <=> b.path_with_namespace }
+      path_map = JSON.load ENV["GITLAB_PATH_MAP"]
+      if path_map.key?(namespace_src)
+        namespace_dst = path_map[namespace_src]
+      else
+        namespace_dst = namespace_src
+      end
+      # destination
+      Helper.log.info("Checking the destination for existing projects with namespace #{namespace_dst}")
+      projects_dst = gitlab_get_projects(namespace: namespace_dst, endpoint: ENV["FL_GITLAB_ENDPOINT_SRC"], api_token: ENV["FL_GITLAB_TOKEN_SRC"]).sort { |a, b| a.path_with_namespace <=> b.path_with_namespace }
+    end
 
     projects_src.each do |project|
       project_path = project.path_with_namespace
 
-      # TODO RENAMING !!!
-      projects_dst = all_projects_dst.select {|p| p.path_with_namespace == project_path}
-
       if projects_dst.empty?
         Helper.log.info("Checks OK, Starting to migrate project #{project_path} to #{ENV['FL_GITLAB_ENDPOINT_DST']}")
+        skip_users = params[:skip_users] || ENV['FL_GITLAB_SKIP_USERS']
         new_project = gitlab_create_project(
-          project: project
+          project: project,
+          skip_users: skip_users
         )
       elsif projects_dst.count == 1
         new_project = projects_dst.first
