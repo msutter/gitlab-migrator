@@ -1,3 +1,4 @@
+require 'pry'
 # Customise that file, documentation can be found here:
 # https://github.com/KrauseFx/fastlane/tree/master/docs
 # All available actions: https://github.com/KrauseFx/fastlane/blob/master/docs/Actions.md
@@ -36,13 +37,19 @@ platform :ios do
       map = {}
       map_files.each do |map_file|
         Helper.log.info("Using map file #{map_file}")
-        content = File.read(map_file)
+        content = ""
+        # read file and exclude commants and empty lines
+        File.read(map_file).each_line do |line|
+          line.chomp!
+          next if line.empty?
+          next if line.include? "#"
+          content = content + line
+        end
         map.merge!(Hash[*content.split(/[; \n]+/)])
       end
       Helper.log.info("Path Map: #{JSON.pretty_generate(map).gsub(":", " =>")}")
       ENV["GITLAB_PATH_MAP"] = JSON.dump map
     end
-
   end
 
   desc "Lists all projects of the source"
@@ -90,7 +97,6 @@ platform :ios do
   desc "Specify the project(s) that should be migrated by its path (with namespace) or by namespace"
   desc "Example: fastlane migrate project:cocoapods/specs"
   lane :migrate do |params|
-
     unless ENV['FL_GITLAB_GET_RPROJECT'] || ENV['FL_GITLAB_GET_RNAMESPACE'] || params[:project] || params[:namespace]
        raise "Please give the project name or the namespace name (group name)"
     end

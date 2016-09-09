@@ -72,8 +72,9 @@ module Fastlane
           Helper.log.info("Existing group '#{group.name}' found")
         else
           Helper.log.info("Group '#{namespace.name}' does not yet exist, will be created now")
+          # TODO
           # group = gitlab_dst.create_group(namespace.name, namespace_dst)
-          group = gitlab_dst.create_group(namespace.name, namespace_dst)
+          group = gitlab_dst.create_group(namespace_dst, namespace_dst)
 
           # Populate group with users
           # Keep in mind: User-Mapping is estimated and not garuanteed. Users have to exist in the new gitlab 
