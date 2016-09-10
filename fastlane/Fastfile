@@ -174,7 +174,7 @@ platform :ios do
         new_project = projects_dst.first
         UI.message("Project #{new_project.path_with_namespace} exists already")
         new_project = modify_migrated_repo(
-          repo_url: new_project.http_url_to_repo,
+          repo_url: project_dst.first.http_url_to_repo,
           custom_script: params[:custom_script]
         )
 
