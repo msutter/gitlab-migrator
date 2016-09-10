@@ -9,6 +9,7 @@ module Fastlane
       def self.run(params)
         client = Gitlab.client(endpoint: params[:endpoint], private_token: params[:api_token])
         all_projects = client.projects.auto_paginate
+        projects = []
         if params[:namespace]
           projects = all_projects.select { |p| p.namespace.path == params[:namespace]}
         elsif params[:project]

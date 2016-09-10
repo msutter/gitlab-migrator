@@ -11,17 +11,18 @@ module Fastlane
         destination = Gitlab.client(endpoint: params[:endpoint_dst], private_token: params[:api_token_dst])
         original_project = params[:project]
         path_map = JSON.load ENV["GITLAB_PATH_MAP"]
-        Helper.log.info "Creating Project: #{path_map[original_project.path_with_namespace]}"
+        UI.message "Creating Project: #{path_map[original_project.path_with_namespace]}"
 
         # Estimate User-Mapping
         user_mapping = map_users(source, destination)
-        Helper.log.info "User Mapping: #{user_mapping}"
+        UI.message "User Mapping: #{user_mapping}"
 
         # Check if the Group and Namespace for the Project exist already
         group = ensure_group(source, destination, original_project.namespace, user_mapping)
 
         # Create the project
         new_project = destination.create_project(original_project.name,
+          path: original_project.path,
           description: original_project.description,
           default_branch: original_project.default_branch,
           group_id: group.id,
@@ -34,7 +35,7 @@ module Fastlane
           public: original_project.public
         )
 
-        Helper.log.info("New Project created with ID: #{new_project.id} -  #{new_project}")
+        UI.message("New Project created with ID: #{new_project.id} -  #{new_project}")
 
         # Create Deploy Keys
         migrate_deploy_keys(source, destination, original_project, new_project)
@@ -58,7 +59,7 @@ module Fastlane
       def self.ensure_group(gitlab_src, gitlab_dst, namespace, user_mapping)
         # check if group has mapping (rename)
         path_map = JSON.load ENV["GITLAB_PATH_MAP"]
-        Helper.log.info("Namespace '#{namespace.path}'")
+        UI.message("Namespace '#{namespace.path}'")
 
         if path_map.key?(namespace.path)
           namespace_dst = path_map[namespace.path]
@@ -66,18 +67,18 @@ module Fastlane
           namespace_dst = namespace.path
         end
 
-        Helper.log.info("Searching for group with name '#{namespace.name}' and path: '#{namespace_dst}'")
+        UI.message("Searching for group with name '#{namespace.name}' and path: '#{namespace_dst}'")
         group = gitlab_dst.groups.auto_paginate.select { |g| g.path == namespace_dst}.first
         if group
-          Helper.log.info("Existing group '#{group.name}' found")
+          UI.message("Existing group '#{group.name}' found")
         else
-          Helper.log.info("Group '#{namespace.name}' does not yet exist, will be created now")
+          UI.message("Group '#{namespace.name}' does not yet exist, will be created now")
           # TODO
           # group = gitlab_dst.create_group(namespace.name, namespace_dst)
           group = gitlab_dst.create_group(namespace_dst, namespace_dst)
 
           # Populate group with users
-          # Keep in mind: User-Mapping is estimated and not garuanteed. Users have to exist in the new gitlab 
+          # Keep in mind: User-Mapping is estimated and not garuanteed. Users have to exist in the new gitlab
           # before migrating projects and their name or username has to match their name/username in the old gitlab
           original_group = gitlab_src.group(namespace.id)
           gitlab_src.group_members(original_group.id).auto_paginate do |user|
@@ -91,48 +92,47 @@ module Fastlane
       # in the new gitlab. If so, an entrie to map the old id to the new id is inserted into the user map
       def self.map_users(gitlab_src, gitlab_dst)
         user_map = {}
-        unless ENV['FL_GITLAB_SKIP_USERS'] == 'true'
-          users_src = gitlab_src.users.auto_paginate
-          users_dst = gitlab_dst.users.auto_paginate
-          users_src.each do |user|
-            users = users_dst.select { |u| u.username == user.username or u.name == user.name}
-            if users.count == 1
-              # Only map users that are unambiguously the same. If there are several matches, dont match them
-              Helper.log.info("Mapping user #{user.username} to #{users.first.username}: #{user.id}=#{users.first.id}")
-              user_map[user.id] = users.first.id
-            end
-          end
-          Helper.log.info("User Mapping determined: #{user_map}")
-          end
+
+          # users_src = gitlab_src.users.auto_paginate
+          # users_dst = gitlab_dst.users.auto_paginate
+          # users_src.each do |user|
+          #   users = users_dst.select { |u| u.username == user.username or u.name == user.name}
+          #   if users.count == 1
+          #     # Only map users that are unambiguously the same. If there are several matches, dont match them
+          #     UI.message("Mapping user #{user.username} to #{users.first.username}: #{user.id}=#{users.first.id}")
+          #     user_map[user.id] = users.first.id
+          #   end
+          # end
+          # UI.message("User Mapping determined: #{user_map}")
         user_map
       end
 
       # Reads all labels from the source project and create them in the destination project
       # Labels are later referenced by name, so we dont need to return an ID-Mapping
       def self.migrate_labels(gitlab_src, gitlab_dst, project_src, project_dst)
-        Helper.log.info("Creating Labels")
+        UI.message("Creating Labels")
         labels = gitlab_src.labels(project_src.id).auto_paginate.each do |label|
           gitlab_dst.create_label(project_dst.id, label.name, label.color)
         end
-        Helper.log.info("Labels created")
+        UI.message("Labels created")
       end
 
       # Reads all deploy-keys from the source project and create them in the destination project
       def self.migrate_deploy_keys(gitlab_src, gitlab_dst, project_src, project_dst)
-        Helper.log.info("Creating Deploy-Keys")
+        UI.message("Creating Deploy-Keys")
         labels = gitlab_src.deploy_keys(project_src.id).auto_paginate.each do |key|
           gitlab_dst.create_deploy_key(project_dst.id, key.title, key.key)
         end
-        Helper.log.info("Deploy-Keys created")
+        UI.message("Deploy-Keys created")
       end
 
       # Reads all milestones from the source project and create them in the destination project
       # Milestones are later referenced by ID, so we need to return a mapping from milestone-id in the old project to milestone-id in the new project
-      def self.migrate_milestones(gitlab_src, gitlab_dst, project_src, project_dst) 
-        Helper.log.info("Migrating Milestones")
+      def self.migrate_milestones(gitlab_src, gitlab_dst, project_src, project_dst)
+        UI.message("Migrating Milestones")
         milestone_map = {}
         gitlab_src.milestones(project_src.id).auto_paginate.sort { |m1, m2| m1.id <=> m2.id }.each do |milestone|
-          new_milestone = gitlab_dst.create_milestone(project_dst.id, 
+          new_milestone = gitlab_dst.create_milestone(project_dst.id,
             milestone.title,
             description: milestone.description,
             due_date: milestone.due_date
@@ -142,20 +142,20 @@ module Fastlane
           end
           milestone_map[milestone.id] = new_milestone.id
         end
-        Helper.log.info("Milestones migrated, milestone map generated: #{milestone_map}")
+        UI.message("Milestones migrated, milestone map generated: #{milestone_map}")
         milestone_map
       end
 
       def self.migrate_issues(gitlab_src, gitlab_dst, project_src, project_dst, usermap, milestonemap)
-        Helper.log.info("Creating Issues")
+        UI.message("Creating Issues")
 
-        Helper.log.info("Usermap: #{usermap}")
-        Helper.log.info("Milestonemap: #{milestonemap}")
+        UI.message("Usermap: #{usermap}")
+        UI.message("Milestonemap: #{milestonemap}")
 
         gitlab_src.issues(project_src.id).auto_paginate.sort { |i1, i2| i1.id <=> i2.id }.each do |issue|
           assignee_id = usermap[issue.assignee.id] if issue.assignee
           milestone_id = milestonemap[issue.milestone.id] if issue.milestone
-          new_issue = gitlab_dst.create_issue(project_dst.id, 
+          new_issue = gitlab_dst.create_issue(project_dst.id,
             issue.title,
             description: issue.description,
             assignee_id: assignee_id,
@@ -169,16 +169,16 @@ module Fastlane
           migrate_issue_notes(gitlab_src, gitlab_dst, project_src, project_dst, issue, new_issue, usermap)
         end
 
-        Helper.log.info("Issues created")
+        UI.message("Issues created")
       end
 
       def self.migrate_issue_notes(gitlab_src, gitlab_dst, project_src, project_dst, issue_src, issue_dst, usermap)
-        Helper.log.info("Migrating issue notes for issue #{issue_src.id}")
+        UI.message("Migrating issue notes for issue #{issue_src.id}")
         gitlab_src.issue_notes(project_src.id, issue_src.id).auto_paginate.sort { |n1, n2| n1.id <=> n2.id }.each  do |note|
           body = "_Original comment by #{note.author.username} on #{Time.parse(note.created_at).strftime("%d %b %Y, %H:%M")}_\n\n---\n\n#{note.body}"
           gitlab_dst.create_issue_note(project_dst.id, issue_dst.id, body)
         end
-        Helper.log.info("Migrated issue notes for issue #{issue_src.id}")
+        UI.message("Migrated issue notes for issue #{issue_src.id}")
       end
 
       #####################################################
@@ -224,11 +224,6 @@ module Fastlane
                                        verify_block: proc do |value|
                                           raise "No Destination API-Token for GitlabeCreateProjectAction given, pass using `api_token_dst: 'token'`".red unless (value and not value.empty?)
                                        end),
-          FastlaneCore::ConfigItem.new(key: :skip_users,
-                                       env_name: "FL_GITLAB_SKIP_USERS",
-                                       description: "Skip user migration",
-                                       is_string: true,
-                                       ),
           FastlaneCore::ConfigItem.new(key: :project,
                                        env_name: "FL_GITLAB_CREATE_PROJECT_PROJECT",
                                        description: "The project that should be created in the target gitlab instance, is expected to be from the source gitlab instance",

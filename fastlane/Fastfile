@@ -1,4 +1,10 @@
 require 'pry'
+# fix 'SSL_connect returned=1 errno=0 state=error: certificate verify failed' error
+require 'openssl'
+OpenSSL::SSL::VERIFY_PEER = OpenSSL::SSL::VERIFY_NONE
+# cert_path = Gem.loaded_specs['google-api-client'].full_gem_path+'/lib/cacerts.pem'
+# ENV['SSL_CERT_FILE'] = cert_path
+
 # Customise that file, documentation can be found here:
 # https://github.com/KrauseFx/fastlane/tree/master/docs
 # All available actions: https://github.com/KrauseFx/fastlane/blob/master/docs/Actions.md
@@ -24,7 +30,7 @@ default_platform :ios
 platform :ios do
   before_all do
     # ENV["SLACK_URL"] = "https://hooks.slack.com/services/..."
-    ENV["GITLAB_API_HTTPARTY_OPTIONS"]="{verify: false}"
+    ENV["GITLAB_API_HTTPARTY_Project with namespaceOPTIONS"]="{verify: false}"
 
     # load projects/namespace mapping
     current_path = File.expand_path(__FILE__)
@@ -32,22 +38,22 @@ platform :ios do
 
     map_files = Dir["#{maps_path}/*"]
     if map_files.empty?
-      Helper.log.info("No mapping file found")
+      UI.message("No mapping file found")
     else
       map = {}
       map_files.each do |map_file|
-        Helper.log.info("Using map file #{map_file}")
+        UI.message("Using map file #{map_file}")
         content = ""
         # read file and exclude commants and empty lines
         File.read(map_file).each_line do |line|
           line.chomp!
           next if line.empty?
           next if line.include? "#"
-          content = content + line
+          content = content + line + "\n"
         end
         map.merge!(Hash[*content.split(/[; \n]+/)])
       end
-      Helper.log.info("Path Map: #{JSON.pretty_generate(map).gsub(":", " =>")}")
+      UI.message("Path Map: #{JSON.pretty_generate(map).gsub(":", " =>")}")
       ENV["GITLAB_PATH_MAP"] = JSON.dump map
     end
   end
@@ -57,8 +63,8 @@ platform :ios do
     projects_src = gitlab_get_projects(namespace: params[:namespace] ,endpoint: ENV["FL_GITLAB_ENDPOINT_SRC"], api_token: ENV["FL_GITLAB_TOKEN_SRC"]).sort { |a, b| a.path_with_namespace <=> b.path_with_namespace }
     projects_dst = gitlab_get_projects(namespace: params[:namespace] ,endpoint: ENV["FL_GITLAB_ENDPOINT_DST"], api_token: ENV["FL_GITLAB_TOKEN_DST"]).sort { |a, b| a.path_with_namespace <=> b.path_with_namespace }
 
-    Helper.log.info "#{projects_src.count} projects Projecst read from the source"
-    Helper.log.info "#{projects_dst.count} projects Projecst read from the destination"
+    UI.message "#{projects_src.count} projects Projecst read from the source"
+    UI.message "#{projects_dst.count} projects Projecst read from the destination"
 
     project_paths_dst = projects_dst.map { |p| p.path.downcase }
     project_paths_src = projects_src.map { |p| p.path.downcase }
@@ -102,24 +108,27 @@ platform :ios do
     end
 
     if project_src = params[:project] || ENV['FL_GITLAB_GET_RPROJECT']
-      project_dst = project_src
       # source
-      Helper.log.info("Checking the source for existing projects with path #{project_src}")
+      UI.message("Checking the source for existing projects with path #{project_src}")
       projects_src = gitlab_get_projects(project: project_src, endpoint: ENV["FL_GITLAB_ENDPOINT_SRC"], api_token: ENV["FL_GITLAB_TOKEN_SRC"]).sort { |a, b| a.path_with_namespace <=> b.path_with_namespace }
-      #Helper.log.info("Project: #{projects_src}")
       raise "Project with path #{project} not found in source #{ENV["FL_GITLAB_ENDPOINT_SRC"]}" unless projects_src.count == 1
 
+      path_map = JSON.load ENV["GITLAB_PATH_MAP"]
+      project_array = project_src.split('/')
+      project_src_namespace = project_array.first
+      project_src_name = project_array.last
+      project_dst = "#{path_map[project_src_namespace] || project_src_namespace}/#{project_src_name}"
+
       # destination
-      Helper.log.info("Checking the destination for existing projects with path #{project_dst}")
-      projects_dst = gitlab_get_projects(project: project_dst, endpoint: ENV["FL_GITLAB_ENDPOINT_SRC"], api_token: ENV["FL_GITLAB_TOKEN_SRC"]).sort { |a, b| a.path_with_namespace <=> b.path_with_namespace }
+      UI.message("Checking the destination for existing projects with path #{project_dst}")
+      projects_dst = gitlab_get_projects(project: project_dst, endpoint: ENV["FL_GITLAB_ENDPOINT_DST"], api_token: ENV["FL_GITLAB_TOKEN_DST"]).sort { |a, b| a.path_with_namespace <=> b.path_with_namespace }
     end
 
     if namespace_src = params[:namespace] || ENV['FL_GITLAB_GET_RNAMESPACE']
       # source
-      Helper.log.info("Checking the source for existing projects with namespace #{namespace_src}")
+      UI.message("Checking the source for existing projects with namespace #{namespace_src}")
       projects_src = gitlab_get_projects(namespace: namespace_src, endpoint: ENV["FL_GITLAB_ENDPOINT_SRC"], api_token: ENV["FL_GITLAB_TOKEN_SRC"]).sort { |a, b| a.path_with_namespace <=> b.path_with_namespace }
-      Helper.log.info("Project: #{projects_src}")
-      raise "Project with namespace #{namespace_src} not found in source #{ENV["FL_GITLAB_ENDPOINT_SRC"]}" unless projects_src.count == 1
+      raise "No projects with namespace #{namespace_src} found in source #{ENV["FL_GITLAB_ENDPOINT_SRC"]}" unless projects_src.count > 0
 
       path_map = JSON.load ENV["GITLAB_PATH_MAP"]
       if path_map.key?(namespace_src)
@@ -128,48 +137,72 @@ platform :ios do
         namespace_dst = namespace_src
       end
       # destination
-      Helper.log.info("Checking the destination for existing projects with namespace #{namespace_dst}")
-      projects_dst = gitlab_get_projects(namespace: namespace_dst, endpoint: ENV["FL_GITLAB_ENDPOINT_SRC"], api_token: ENV["FL_GITLAB_TOKEN_SRC"]).sort { |a, b| a.path_with_namespace <=> b.path_with_namespace }
+      UI.message("Checking the destination for existing projects with namespace #{namespace_dst}")
+      projects_dst = gitlab_get_projects(namespace: namespace_dst, endpoint: ENV["FL_GITLAB_ENDPOINT_DST"], api_token: ENV["FL_GITLAB_TOKEN_DST"]).sort { |a, b| a.path_with_namespace <=> b.path_with_namespace }
     end
 
     projects_src.each do |project|
       project_path = project.path_with_namespace
-
-      if projects_dst.empty?
-        Helper.log.info("Checks OK, Starting to migrate project #{project_path} to #{ENV['FL_GITLAB_ENDPOINT_DST']}")
-        skip_users = params[:skip_users] || ENV['FL_GITLAB_SKIP_USERS']
+      project_dst = projects_dst.select {|p| p.path == project.path}
+      if project_dst.empty?
+        UI.message("Checks OK, Starting to migrate project #{project_path} to #{ENV['FL_GITLAB_ENDPOINT_DST']}")
         new_project = gitlab_create_project(
           project: project,
-          skip_users: skip_users
         )
-      elsif projects_dst.count == 1
+        UI.message("Gitlab project has been migrated, now migrate the repository")
+
+        if ENV["FL_GIT_PROTOCOL_SRC"] && (ENV["FL_GIT_PROTOCOL_SRC"].downcase == 'https')
+          git_protocol_src = project.http_url_to_repo
+        else
+          git_protocol_src = project.ssh_url_to_repo
+        end
+
+        if ENV["FL_GIT_PROTOCOL_DST"] && (ENV["FL_GIT_PROTOCOL_DST"].downcase == 'https')
+          git_protocol_dst = new_project.http_url_to_repo
+        else
+          git_protocol_dst = new_project.ssh_url_to_repo
+        end
+
+        migrate_git_repository(from_repo_url: git_protocol_src, to_repo_url: git_protocol_dst)
+
+        if project.wiki_enabled
+          UI.message("Migrating wiki-repository")
+          migrate_git_repository(from_repo_url: git_protocol_src.gsub('.git', '.wiki.git'), to_repo_url: git_protocol_dst.gsub('.git', '.wiki.git'))
+        end
+
+      elsif project_dst.count == 1
         new_project = projects_dst.first
-        Helper.log.info("Project exists already, only migrating the repository")
+        UI.message("Project #{new_project.path_with_namespace} exists already")
+        new_project = modify_migrated_repo(
+          repo_url: new_project.http_url_to_repo,
+          custom_script: params[:custom_script]
+        )
+
       else
-        Helper.log.error("Several potential target projects exist: #{projects_dst}")
+        Helper.log.error("Several potential target projects exist: #{project_dst}")
         raise "Several potential target projects exist, dont know which one to pick"
       end
 
-      Helper.log.info("Gitlab project has been migrated, now migrate the repository")
+      # UI.message("Gitlab project has been migrated, now migrate the repository")
 
-      if ENV["FL_GIT_PROTOCOL_SRC"] && (ENV["FL_GIT_PROTOCOL_SRC"].downcase == 'https')
-        git_protocol_src = project.http_url_to_repo
-      else
-        git_protocol_src = project.ssh_url_to_repo
-      end
+      # if ENV["FL_GIT_PROTOCOL_SRC"] && (ENV["FL_GIT_PROTOCOL_SRC"].downcase == 'https')
+      #   git_protocol_src = project.http_url_to_repo
+      # else
+      #   git_protocol_src = project.ssh_url_to_repo
+      # end
 
-      if ENV["FL_GIT_PROTOCOL_DST"] && (ENV["FL_GIT_PROTOCOL_DST"].downcase == 'https')
-        git_protocol_dst = new_project.http_url_to_repo
-      else
-        git_protocol_dst = new_project.ssh_url_to_repo
-      end
+      # if ENV["FL_GIT_PROTOCOL_DST"] && (ENV["FL_GIT_PROTOCOL_DST"].downcase == 'https')
+      #   git_protocol_dst = new_project.http_url_to_repo
+      # else
+      #   git_protocol_dst = new_project.ssh_url_to_repo
+      # end
 
-      migrate_git_repository(custom_script: params[:custom_script],from_repo_url: git_protocol_src, to_repo_url: git_protocol_dst)
+      # migrate_git_repository(custom_script: params[:custom_script],from_repo_url: git_protocol_src, to_repo_url: git_protocol_dst)
 
-      if project.wiki_enabled
-        Helper.log.info("Migrating wiki-repository")
-        migrate_git_repository(custom_script: params[:custom_script], from_repo_url: git_protocol_src.gsub('.git', '.wiki.git'), to_repo_url: git_protocol_dst.gsub('.git', '.wiki.git'))
-      end
+      # if project.wiki_enabled
+      #   UI.message("Migrating wiki-repository")
+      #   migrate_git_repository(custom_script: params[:custom_script], from_repo_url: git_protocol_src.gsub('.git', '.wiki.git'), to_repo_url: git_protocol_dst.gsub('.git', '.wiki.git'))
+      # end
     end
   end
 

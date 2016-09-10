@@ -1,28 +1,27 @@
-# # 1-1 migration (needed for custom scripts)
-# puppet-forge;puppet-forge
-# puppet-osbase;puppet-osbase
-# puppet-services;puppet-services
-# cloudtools;cloudtools
-# puppet-roles;puppet-roles
-# cfmg-puppet-hieradata;cfmg-puppet-hieradata
-# cfmg-win-packaging;cfmg-win-packaging
-# puppet-dsc;puppet-dsc
-# cfmg-splunk-apps;cfmg-splunk-apps
-# puppet-osbase-windows;puppet-osbase-windows
-# cfmg-puppet-dop;cfmg-puppet-dop
-# cfmg-gen;cfmg-gen
-# cfmg-cd;cfmg-cd
-# puppet-user-group;puppet-user-group
+# 1-1 migration (needed for custom scripts)
+puppet-forge;puppet-forge
+puppet-osbase;puppet-osbase
+puppet-services;puppet-services
+cloudtools;cloudtools
+puppet-roles;puppet-roles
+cfmg-puppet-hieradata;cfmg-puppet-hieradata
+cfmg-win-packaging;cfmg-win-packaging
+puppet-dsc;puppet-dsc
+cfmg-splunk-apps;cfmg-splunk-apps
+puppet-osbase-windows;puppet-osbase-windows
+cfmg-puppet-dop;cfmg-puppet-dop
+cfmg-gen;cfmg-gen
+cfmg-cd;cfmg-cd
+puppet-user-group;puppet-user-group
 
-# ## rename
-# puppet;puppet-tools
-# cicd;cfmg-ci
-# powershell;cfmg-powershell-modules
+## rename
+puppet;puppet-tools
+cicd;cfmg-ci
+powershell;cfmg-powershell-modules
 
-# ## move
-# git-clu;cloudtools
-# gitlab;cloudtools
+## move
+gitlab;cloudtools
+git-clu;cloudtools-migration-test
 
 # testing
-#powershell-gallery;powershell-gallery-migration-test
-powershell-gallery;powershell-gallery
+powershell-gallery;powershell-gallery-migration-test

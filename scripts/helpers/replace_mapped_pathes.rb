@@ -1,15 +1,15 @@
 #!/usr/bin/ruby
-require 'json'
 require 'fastlane'
 require 'rbconfig'
+require 'pry'
 
 def replace_mapped_pathes(gitlab_src, gitlab_dst, path_map)
   replace_regexps = get_mapped_regex(gitlab_src, gitlab_dst, path_map)
   replace_regexps.each do |orig_text,regex|
-    puts orig_text
-    puts regex
     command = sed_command(orig_text, regex)
     puts command
+    result = %x(#{command})
+    puts result
   end
 end
 
@@ -18,8 +18,10 @@ def get_mapped_regex(gitlab_src, gitlab_dst, path_map)
   path_map.each do |k,v|
     group_path_src = "#{gitlab_src}/#{k}"
     group_path_dst = "#{gitlab_dst}/#{v}"
-    regex_src = Regexp.quote(group_path_src)
-    replace_regexps[group_path_src] = "s/#{regex_src}/#{group_path_dst}/g"
+    gitlab_src_reg = Regexp.quote(group_path_src)
+    gitlab_src_reg.sub! '/', '\\/'
+    group_path_dst.sub! '/', '\\/'
+    replace_regexps[group_path_src] = "s/#{gitlab_src_reg}/#{group_path_dst}/g"
   end
   replace_regexps
 end
@@ -54,4 +56,4 @@ def sed_command(orig_text, regex)
 end
 
 path_map = JSON.load ENV["GITLAB_PATH_MAP"]
-replace_mapped_pathes(Arg[0], Arg[1], path_map)
+replace_mapped_pathes(ARGV[0], ARGV[1], path_map)
