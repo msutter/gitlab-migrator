@@ -1,0 +1,24 @@
+# # 1-1 migration (needed for custom scripts)
+# puppet-forge-mig;puppet-forge
+# puppet-osbase-mig;puppet-osbase
+# puppet-services-mig;puppet-services
+# cloudtools-mig;cloudtools
+# puppet-roles-mig;puppet-roles
+# cfmg-puppet-hieradata-mig;cfmg-puppet-hieradata
+# cfmg-win-packaging-mig;cfmg-win-packaging
+# puppet-dsc-mig;puppet-dsc
+# cfmg-splunk-apps-mig;cfmg-splunk-apps
+# puppet-osbase-windows-mig;puppet-osbase-windows
+# cfmg-puppet-dop-mig;cfmg-puppet-dop
+# cfmg-gen-mig;cfmg-gen
+# cfmg-cd-mig;cfmg-cd
+# puppet-user-group-mig;puppet-user-group
+
+# ## rename
+# puppet-mig;puppet-tools
+# cicd-mig;cfmg-ci
+# powershell-mig;cfmg-powershell-modules
+
+# ## move
+# gitlab-mig;cloudtools
+# git-clu-mig;cloudtools

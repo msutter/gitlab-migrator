@@ -1,3 +1,4 @@
+require_relative '../scripts/helpers/get_map_from_dir'
 require 'pry'
 # fix 'SSL_connect returned=1 errno=0 state=error: certificate verify failed' error
 require 'openssl'
@@ -36,26 +37,9 @@ platform :ios do
     current_path = File.expand_path(__FILE__)
     maps_path = "#{File.dirname(File.dirname(current_path))}/maps"
 
-    map_files = Dir["#{maps_path}/*"]
-    if map_files.empty?
-      UI.message("No mapping file found")
-    else
-      map = {}
-      map_files.each do |map_file|
-        UI.message("Using map file #{map_file}")
-        content = ""
-        # read file and exclude commants and empty lines
-        File.read(map_file).each_line do |line|
-          line.chomp!
-          next if line.empty?
-          next if line.include? "#"
-          content = content + line + "\n"
-        end
-        map.merge!(Hash[*content.split(/[; \n]+/)])
-      end
-      UI.message("Path Map: #{JSON.pretty_generate(map).gsub(":", " =>")}")
-      ENV["GITLAB_PATH_MAP"] = JSON.dump map
-    end
+    map = get_map_form_dir(maps_path)
+    UI.message("Path Map: #{JSON.pretty_generate(map).gsub(":", " =>")}") unless map.empty?
+    ENV["GITLAB_PATH_MAP"] = JSON.dump map unless map.empty?
   end
 
   desc "Lists all projects of the source"
