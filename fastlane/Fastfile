@@ -125,6 +125,9 @@ platform :ios do
       projects_dst = gitlab_get_projects(namespace: namespace_dst, endpoint: ENV["FL_GITLAB_ENDPOINT_DST"], api_token: ENV["FL_GITLAB_TOKEN_DST"]).sort { |a, b| a.path_with_namespace <=> b.path_with_namespace }
     end
 
+    projects_dst_path_names = projects_dst.map{|p| p.path}.join(';')
+    ENV["GITLAB_DST_PROJECTS"] = projects_dst_path_names
+
     projects_src.each do |project|
       project_path = project.path_with_namespace
       project_dst = projects_dst.select {|p| p.path == project.path}

@@ -1,4 +1,3 @@
-require 'pry'
 #!/usr/bin/ruby
 def get_map_form_dir(maps_dir)
   map_files = Dir["#{maps_dir}/*"]
@@ -21,7 +20,6 @@ def get_map_form_file(map_file)
     content = ""
     # read file and exclude commants and empty lines
     File.read(map_file).each_line do |line|
-      line.chomp!
       next if line.empty?
       next if line.include? "#"
       content = content + line + "\n"

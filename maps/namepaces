@@ -21,7 +21,7 @@ powershell;cfmg-powershell-modules
 
 ## move
 gitlab;cloudtools
-#git-clu;cloudtools
+git-clu;cloudtools
 
 # testing
 powershell-gallery;powershell-gallery-migration-test
